@@ -55,6 +55,11 @@ def load_model(model_path: str) -> tuple[ViTForImageClassification, ViTImageProc
         logger.info("Model converted to half precision")
     model.eval()
 
+    if device.type == "cuda":
+        logger.info("Compiling model with torch.compile")
+        model = torch.compile(model, mode="reduce-overhead")
+        logger.info("Model compilation complete")
+
     logger.info(f"Model loaded on {device}")
 
     return model, processor, device
