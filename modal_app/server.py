@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from transformers import ViTForImageClassification
 import torchvision.transforms as transforms  # type: ignore
+from time import time
 
 # Create Modal app
 app = modal.App("deepfake-detection-server")
@@ -69,7 +70,6 @@ def load_model_on_startup():
             logger.info("Model converted to half precision")
         model.eval()
 
-        # Compile model on GPU for better performance
         if device.type == "cuda":
             logger.info("Compiling model with torch.compile...")
             model = torch.compile(model, mode="reduce-overhead")
@@ -164,6 +164,7 @@ async def predict_endpoint(file: UploadFile = File(...)) -> Dict[str, Any]:
     """
     Predict if an image is deepfake or real
     """
+    start = time()
     logger.info(f"Prediction request received: filename={file.filename}, content_type={file.content_type}")
 
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -192,7 +193,8 @@ async def predict_endpoint(file: UploadFile = File(...)) -> Dict[str, Any]:
         logger.info(f"Prediction complete: label={result['label']}, score={result['score']:.4f}, time={processing_time:.2f}ms")
 
         result['processing_time_ms'] = processing_time
-
+        request_time = time() - start
+        logger.info(f"Request time:{request_time}")
         return result
 
     except Exception as e:
@@ -202,7 +204,7 @@ async def predict_endpoint(file: UploadFile = File(...)) -> Dict[str, Any]:
 
 @app.function(
     image=image,
-    gpu="B200",
+    gpu="L4",
     volumes={MODEL_DIR: model_volume},
     container_idle_timeout=300,
     timeout=3600,
